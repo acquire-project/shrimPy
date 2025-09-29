@@ -543,7 +543,7 @@ class MantisAcquisition(object):
     def close(self):
         # Log final O3 stage position
         if self.ls_acq.o3_stage:
-            _pos = float(self.ls_acq.mmc.get_position(self.ls_acq.o3_stage))
+            _pos = float(self.ls_acq.mmc.getPosition(self.ls_acq.o3_stage))
             logger.debug(f'Final O3 stage position: {_pos:.3f} um')
 
         # Shut down DAQ

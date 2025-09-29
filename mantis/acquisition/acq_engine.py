@@ -285,7 +285,7 @@ class BaseChannelSliceAcquisition(object):
             x_size = self.mmc.getImageWidth()
             y_size = self.mmc.getImageHeight()
 
-            if output_path:
+            if False: # output_path:
                 zarr_settings = aqz.StreamSettings(
                     store_path=output_path,
                     dtype=aqz.DataType.UINT16,  # FIXME: hardcoded for now, should be set from acquisition settings

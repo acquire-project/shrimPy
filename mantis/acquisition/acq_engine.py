@@ -838,7 +838,7 @@ class MantisAcquisition(object):
                 config_group = self.ls_acq.channel_settings.channel_group
                 config = self.ls_acq.mmc.getConfigData(config_group, config_name)
                 ts2_ttl_state = int(
-                    config.get_setting('TS2_TTL1-8', 'State').get_property_value()
+                    config.getSetting('TS2_TTL1-8', 'State').getPropertyValue()
                 )
                 if ts2_ttl_state == 32:
                     # State 32 corresponds to illumination with 488 laser
@@ -1036,50 +1036,63 @@ class MantisAcquisition(object):
                 # mmc.setPosition(z_stage, z_range[len(z_range) // 2])  # reset o3 stage
 
                 
-                global acq_finished
-                acq_finished = False
+                # global acq_finished
+                # acq_finished = False
                 acq_fps = 20  # TODO: hardcoded for now
                 camera = 'Prime BSI Express'
                 num_slices = len(z_range)
                 acq_duration = num_slices / acq_fps + 5  # Extra buffer time
 
-                def check_acq_finished(axes, dataset):
-                    global acq_finished
-                    if axes['z'] == num_slices - 1:
-                        acq_finished = True
+                # def check_acq_finished(axes, dataset):
+                #     global acq_finished
+                #     if axes['z'] == num_slices - 1:
+                #         acq_finished = True
 
                 microscope_operations.set_z_position(mmc, z_stage, z_range[0])
 
                 logger.debug('Starting pycromanager O3 autofocus acquisition')
-                events = multi_d_acquisition_events(
-                    z_start=z_range[0],
-                    z_end=z_range[-1],
-                    z_step=z_range[1] - z_range[0],
-                )
-                acq = Acquisition(
-                    tempdir.name,
-                    f'ls_refocus_p{p_idx}',
-                    port=LS_ZMQ_PORT,
-                    image_saved_fn=check_acq_finished,
-                    show_display=False,
-                )
-                acq.acquire(events)
-                acq.mark_finished()
-                start_time = time.time()
-                while not acq_finished and time.time() - start_time < acq_duration:
-                    time.sleep(0.2)
-                if acq_finished:
-                    acq.await_completion()
-                    logger.debug('Pycromanager acquisition finished. Fetching data')
-                    ds = acq.get_dataset()
-                    data.append(np.asarray(ds.as_array()))
-                    logger.debug('Data retrieved. Closing dataset')
-                    ds.close()
-                else:
-                    logger.error('O3 autofocus is taking longer than expected - aborting.')
-                    microscope_operations.abort_acquisition_sequence(self.ls_acq.mmc, camera)
-                    acq.await_completion()  # Cleanup
-                    acq.get_dataset().close()  # Close dataset
+                # events = multi_d_acquisition_events(
+                #     z_start=z_range[0],
+                #     z_end=z_range[-1],
+                #     z_step=z_range[1] - z_range[0],
+                # )
+                mda = useq.MDASequence(z_plan=useq.ZAbsolutePositions(z_range))
+                
+                # acq = Acquisition(
+                #     tempdir.name,
+                #     f'ls_refocus_p{p_idx}',
+                #     port=LS_ZMQ_PORT,
+                #     image_saved_fn=check_acq_finished,
+                #     show_display=False,
+                # )
+                
+                def append_data(img: np.ndarray, event: useq.MDAEvent):
+                    data.append(img)
+                    
+                mmc.mda.events.frameReady.connect(append_data)
+                
+                # run the MDA & block the thread
+                mmc.run_mda(mda, block=True)
+                
+                # JGE: I do not think we need any of the following with pymmcore. 
+                # acq.acquire(events)
+                # acq.mark_finished()
+                # 
+                # start_time = time.time()
+                # while not acq_finished and time.time() - start_time < acq_duration:
+                #     time.sleep(0.2)
+                # if acq_finished:
+                #     acq.await_completion()
+                #     logger.debug('Pycromanager acquisition finished. Fetching data')
+                #     ds = acq.get_dataset()
+                #     data.append(np.asarray(ds.as_array()))
+                #     logger.debug('Data retrieved. Closing dataset')
+                #     ds.close()
+                # else:
+                #     logger.error('O3 autofocus is taking longer than expected - aborting.')
+                #     microscope_operations.abort_acquisition_sequence(self.ls_acq.mmc, camera)
+                #     acq.await_completion()  # Cleanup
+                #     acq.get_dataset().close()  # Close dataset
             else:
                 z_stack = microscope_operations.acquire_defocus_stack(
                     mmc, z_stage, z_range, backlash_correction_distance=KIM101_BACKLASH
@@ -1095,6 +1108,9 @@ class MantisAcquisition(object):
             mmc, 'Prime BSI Express', 'TriggerMode', 'Edge Trigger'
         )
 
+        # Reset frameready connection
+        mmc.mda.events.frameReady.disconnect(append_data)
+        
         # Reset stages
         microscope_operations.setPosition(mmc, galvo, p0)
         microscope_operations.setPosition(mmc, z_stage, z0)

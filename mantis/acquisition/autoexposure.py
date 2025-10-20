@@ -15,7 +15,8 @@
 import numpy as np
 import pandas as pd
 
-from mantis import logger
+from pymmcore_plus._logger import logger
+
 from mantis.acquisition.AcquisitionSettings import AutoexposureSettings
 
 

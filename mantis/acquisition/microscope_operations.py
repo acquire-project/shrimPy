@@ -1,4 +1,3 @@
-import logging
 import time
 
 from functools import partial
@@ -13,11 +12,10 @@ from pylablib.devices.Thorlabs import KinesisPiezoMotor
 
 # from pycromanager import Core, Studio
 from pymmcore_plus import CMMCorePlus
+from pymmcore_plus._logger import logger
 
 from mantis.acquisition.AcquisitionSettings import AutoexposureSettings
 from mantis.acquisition.autoexposure import manual_autoexposure, mean_intensity_autoexposure
-
-logger = logging.getLogger(__name__)
 
 KIM101_COMPENSATION_FACTOR = 1.0
 

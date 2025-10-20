@@ -1,8 +1,6 @@
-import logging
+from pymmcore_plus._logger import logger
 
 from mantis.acquisition.microscope_operations import get_daq_counter_names, start_daq_counter
-
-logger = logging.getLogger(__name__)
 
 
 def start_daq_counters(ctr_tasks, events):

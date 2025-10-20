@@ -1,4 +1,3 @@
-import logging
 import os
 import time
 
@@ -20,6 +19,7 @@ import useq
 
 from nidaqmx.constants import Slope
 from pymmcore_plus import CMMCorePlus
+from pymmcore_plus._logger import logger
 from waveorder.focus import focus_from_transverse_band
 
 from mantis import get_console_formatter
@@ -82,7 +82,7 @@ LS_ACQ_LABEL = 'lightsheet'
 NA_DETECTION = 1.35
 LS_PIXEL_SIZE = 6.5 / (40 * 1.4)  # in um
 
-logger = logging.getLogger(__name__)
+# logger is imported from pymmcore_plus._logger
 
 
 class BaseChannelSliceAcquisition(object):
@@ -474,6 +474,8 @@ class MantisAcquisition(object):
         configure_debug_logger(acq_log_path)
         # configure copylot logger with matching stream handler
         # indexing into handlers[0] is a hack
+        import logging
+
         copylot.enable_logging(acq_log_path, logging.INFO)
         console_format = get_console_formatter()
         logging.getLogger('copylot').handlers[0].setFormatter(console_format)

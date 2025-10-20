@@ -1,8 +1,6 @@
-import logging
+from pymmcore_plus._logger import logger
 
 from . import globals
-
-logger = logging.getLogger(__name__)
 
 
 def get_first_acquisition_event(events):

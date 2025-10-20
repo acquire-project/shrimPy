@@ -1,4 +1,4 @@
-import logging
+from pymmcore_plus._logger import logger
 
 from mantis.acquisition.microscope_operations import (
     get_daq_counter_names,
@@ -8,8 +8,6 @@ from mantis.acquisition.microscope_operations import (
 from . import globals
 
 daq_debug = False
-
-logger = logging.getLogger(__name__)
 
 
 def log_preparing_acquisition(events):

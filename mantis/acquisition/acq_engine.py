@@ -433,6 +433,28 @@ class BaseChannelSliceAcquisition(object):
                     self.mmc, self.slice_settings.z_stage_name, self._z0
                 )
 
+    def shutdown(self):
+        """
+        Complete device shutdown and cleanup
+        """
+        if self.enabled and self.mmc:
+            try:
+                # Disconnect event handlers first
+                if hasattr(self, '_zarr_writer'):
+                    try:
+                        self.mmc.mda.events.frameReady.disconnect(self.write_data)
+                        logger.debug(f'{self.type.capitalize()} frameReady event handler disconnected')
+                    except Exception:
+                        pass  # May already be disconnected
+                
+                # Unload all devices and reset core
+                self.mmc.unloadAllDevices()
+                self.mmc.reset()
+                self.mmc.setPrimaryLogFile("")
+                logger.debug(f'{self.type.capitalize()} devices unloaded and core reset')
+            except Exception as e:
+                logger.error(f'Error during {self.type} shutdown: {e}')
+
     def run_sequence(self, events: Iterable[useq.MDAEvent]) -> Thread:
         """
         Run the acquisition using the provided events.
@@ -613,7 +635,13 @@ class MantisAcquisition(object):
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        self.close()
+        try:
+            self.close()
+        except Exception as e:
+            logger.error(f'Error during acquisition cleanup: {e}')
+            # Don't suppress the original exception if one exists
+            if exc_type is None:
+                raise
 
     def close(self):
         # Log final O3 stage position
@@ -629,12 +657,49 @@ class MantisAcquisition(object):
         self.lf_acq.reset()
         self.ls_acq.reset()
 
-        # Abort acquisitions if they have not finished, usually after Ctr+C
-        # if self._lf_acq_obj:
-        #     self._lf_acq_obj.abort()
-        # if self._ls_acq_obj:
-        #     self._ls_acq_obj.abort()
-        logger.debug('FIXME: cleanup acquisition')
+        # Properly shutdown MMCore instances
+        if self.lf_acq.enabled:
+            try:
+                self.lf_acq.shutdown()
+                logger.debug('Label-free acquisition shutdown complete')
+            except Exception as e:
+                logger.error(f'Error during LF acquisition shutdown: {e}')
+        
+        if self.ls_acq.enabled:
+            try:
+                self.ls_acq.shutdown()
+                logger.debug('Light-sheet acquisition shutdown complete')
+            except Exception as e:
+                logger.error(f'Error during LS acquisition shutdown: {e}')
+
+        logger.debug('Acquisition cleanup complete')
+
+    def abort_and_cleanup(self):
+        """
+        Abort running acquisitions and cleanup properly
+        """
+        logger.debug('Aborting running acquisitions')
+        
+        # Cancel any running MDAs
+        if self.lf_acq.enabled and self.lf_acq.mmc and self.lf_acq.mmc.mda.is_running():
+            try:
+                self.lf_acq.mmc.mda.cancel()
+                logger.debug('Label-free MDA cancelled')
+            except Exception as e:
+                logger.error(f'Error cancelling LF MDA: {e}')
+                
+        if self.ls_acq.enabled and self.ls_acq.mmc and self.ls_acq.mmc.mda.is_running():
+            try:
+                self.ls_acq.mmc.mda.cancel()
+                logger.debug('Light-sheet MDA cancelled')
+            except Exception as e:
+                logger.error(f'Error cancelling LS MDA: {e}')
+        
+        # Wait a moment for cancellation to take effect
+        time.sleep(0.5)
+        
+        # Then proceed with normal cleanup
+        self.close()
 
     def update_position_settings(self):
         """

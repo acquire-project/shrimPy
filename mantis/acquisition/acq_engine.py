@@ -439,6 +439,13 @@ class BaseChannelSliceAcquisition(object):
         """
         if self.enabled and self.mmc:
             try:
+                # Stop sequence acquisition if running
+                try:
+                    self.mmc.stopSequenceAcquisition()
+                    logger.debug(f'{self.type.capitalize()} sequence acquisition stopped')
+                except Exception:
+                    pass  # May not be running
+                
                 # Disconnect event handlers first
                 if hasattr(self, '_zarr_writer'):
                     try:
@@ -679,6 +686,21 @@ class MantisAcquisition(object):
         Abort running acquisitions and cleanup properly
         """
         logger.debug('Aborting running acquisitions')
+        
+        # Stop sequence acquisitions first
+        if self.lf_acq.enabled and self.lf_acq.mmc:
+            try:
+                self.lf_acq.mmc.stopSequenceAcquisition()
+                logger.debug('Label-free sequence acquisition stopped')
+            except Exception as e:
+                logger.error(f'Error stopping LF sequence acquisition: {e}')
+                
+        if self.ls_acq.enabled and self.ls_acq.mmc:
+            try:
+                self.ls_acq.mmc.stopSequenceAcquisition()
+                logger.debug('Light-sheet sequence acquisition stopped')
+            except Exception as e:
+                logger.error(f'Error stopping LS sequence acquisition: {e}')
         
         # Cancel any running MDAs
         if self.lf_acq.enabled and self.lf_acq.mmc and self.lf_acq.mmc.mda.is_running():
